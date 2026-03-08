@@ -13,7 +13,7 @@ pipeline {
         JAR_FILE_NAME = "app.jar" // 복사할 JAR 파일 이름
         PORT = "8081" // 컨테이너와 연결할 포트
         REMOTE_USER = "ec2-user" // 원격(spring) 서버 사용자
-        REMOTE_HOST = "" // 원격(spring) 서버 IP(Public IP)
+        REMOTE_HOST = "3.34.12.117" // 원격(spring) 서버 IP(Public IP)
         REMOTE_DIR = "/home/ec2-user/deploy" // 원격 서버에 파일 복사할 경로
         SSH_CREDENTIALS_ID = "7553f762-28c2-4ec3-9e73-97dba2c6c953" // Jenkins SSH 자격 증명 ID
     }
@@ -59,7 +59,7 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@$
     docker rm -f ${CONTAINER_NAME} || true
     docker build -t ${DOCKER_IMAGE} .
     docker run -d --name ${CONTAINER_NAME} -p ${PORT}:${PORT} ${DOCKER_IMAGE}
-ENDSSH                    
+ENDSSH
                     """
                 }
             }
