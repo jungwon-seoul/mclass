@@ -5,7 +5,7 @@ pipeline {
         maven 'maven 3.9.12'
         // Jenkins에 등록된 Maven 사용
     }
-     
+
     environment {
         // 배포에 필요한 변수 설정
         DOCKER_IMAGE = "demo-app" // 도커 이미지 이름 
@@ -18,22 +18,53 @@ pipeline {
         SSH_CREDENTIALS_ID = "7553f762-28c2-4ec3-9e73-97dba2c6c953" // Jenkins SSH 자격 증명 ID
     }
 
-     // 여러 단계를 그룹화
+    // 여러 단계를 그룹화
     stages {
         stage('Git checkout') {
-            steps { // steps: stage 안에서 실행할 실제 명령어
-            // Jenkins가 연결된 git 저장소에서 최신 코드 체크아웃
-            checkout scm
+            steps { // steps : stage 안에서 실행할 실제 명령어
+                // Jenkins가 연결된 git 저장소에서 최신 코드 체크아웃
+                checkout scm
             }
         }
 
-        stage ('Maven Build') {
+        stage('Maven Build') {
             steps {
                 // 테스트는 건너뛰고 Maven 빌드
                 sh 'mvn clean package -DskipTests'
                 // sh : 리눅스 명령어 실행
             }
         }
+
+        stage('Prepare Jar') {
+            steps {
+                sh 'cp target/demo-0.0.1-SNAPSHOT.jar ${JAR_FILE_NAME}'
+            }
+        }
+
+        stage('Copy to Remote Server') {
+            steps {
+                sshagent (credentials: [env.SSH_CREDENTIALS_ID]) {
+                    sh "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@${REMOTE_HOST} \"mkdir -p ${REMOTE_DIR}\""
+                    sh "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${JAR_FILE_NAME} Dockerfile ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/"
+                }
+            }
+        }
+
+        stage('Remote Docker Build & Deploy') {
+            steps {
+                sshagent (credentials: [env.SSH_CREDENTIALS_ID]) {
+                    sh """
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@${REMOTE_HOST} << ENDSSH
+    cd ${REMOTE_DIR} || exit 1
+    docker rm -f ${CONTAINER_NAME} || true
+    docker build -t ${DOCKER_IMAGE} .
+    docker run -d --name ${CONTAINER_NAME} -p ${PORT}:${PORT} ${DOCKER_IMAGE}
+ENDSSH                    
+                    """
+                }
+            }
+        }
+
     }
 
 }
